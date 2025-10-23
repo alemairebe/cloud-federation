@@ -1,0 +1,7 @@
+# requests
+# google-auth
+# msal
+# base64
+# boto3
+azure-identity
+azure-storage-blob
