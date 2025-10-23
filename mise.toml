@@ -1,0 +1,25 @@
+[tools]
+"pipx:azure-cli" = { version = "latest", uvx_args = "--default-index https://azurecliprod.blob.core.windows.net/edge --prerelease=allow --index-strategy unsafe-best-match" }
+gcloud = "latest"
+opentofu = "latest"
+python = "3.13"
+terraform = "latest"
+uv = "latest"
+
+[tasks.deploy]
+run = "tofu apply -auto-approve"
+dir = "{{cwd}}" # run in user's cwd, default is the project's base directory
+
+[tasks.ci]
+description = 'Run CI tasks'
+depends = ['deploy', 'test']
+
+[tasks.test]
+description = 'Run automated tests'
+wait_for = ["deploy"]
+# multiple commands are run in series
+run = "./test/run.sh"
+dir = "{{cwd}}" # run in user's cwd, default is the project's base directory
+
+[env]
+AZURE_CORE_COLLECT_TELEMETRY=false

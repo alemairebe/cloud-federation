@@ -1,0 +1,2 @@
+The Azure federated identity `subject` is the `cognito_identity_id` generated from the cli in `resource "terraform_data" "cognito_identity_id"`
+To generate the `subject`; the `login` parameter of the `get-open-id-token-for-developer-identity` is `logins` with value `${aws_cognito_identity_pool.main.developer_provider_name}=${aws_lambda_function.orchestrator.arn}`
