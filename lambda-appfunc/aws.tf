@@ -9,7 +9,9 @@ locals {
   lambda_src_hash = md5(join("", [
     for f in local.lambda_src_files : filemd5("${local.lambda_src_path}/${f}")
   ]))
+  audience = "${app_name_prefix}-audience"
 }
+resource "aws_iam_outbound_web_identity_federation" "this" {}
 
 resource "terraform_data" "build_lambda_function" {
   triggers_replace = {
@@ -63,6 +65,26 @@ resource "aws_iam_policy" "cognito_policy" {
         Action   = "cognito-identity:GetOpenIdTokenForDeveloperIdentity"
         Effect   = "Allow"
         Resource = aws_cognito_identity_pool.main.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "sts_web_identity_policy" {
+  name        = "${var.app_name_prefix}-sts-outbount-federation-policy"
+  description = "Allows Lambda to get a token from STS for outbound federation"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = "sts:GetWebIdentityToken"
+        Effect   = "Allow"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "sts:IdentityTokenAudience" = azuread_application.lambda_app.application_id
+          }
+        }
       }
     ]
   })

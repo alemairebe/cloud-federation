@@ -90,3 +90,12 @@ resource "azuread_application_federated_identity_credential" "lambda_federation"
   issuer         = "https://cognito-identity.amazonaws.com"
   subject        = trimspace(data.local_file.cognito_identity_id.content)
 }
+
+resource "azuread_application_federated_identity_credential" "aws_sts_federation" {
+  application_id = azuread_application.lambda_app.id
+  display_name   = "AWSFederation"
+  description    = "Trusts tokens from AWS STS for outbound federation"
+  audiences      = [local.audience]
+  issuer         = aws_iam_outbound_web_identity_federation.this.issuer_identifier
+  subject        = aws_iam_role.lambda_exec.arn
+}

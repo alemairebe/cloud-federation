@@ -7,11 +7,13 @@ import boto3
 AZURE_TENANT_ID = os.environ["AZURE_TENANT_ID"]
 AZURE_CLIENT_ID = os.environ["AZURE_CLIENT_ID"]
 AZURE_FUNCTION_URL = os.environ["AZURE_FUNCTION_URL"]
+AZURE_AUDIENCE = os.environ["AZURE_AUDIENCE"]
 AZURE_API_SCOPE = os.environ["AZURE_API_SCOPE"] # This will now be "api://multicloud-api/.default"
 
 # Cognito variables
 COGNITO_IDENTITY_POOL_ID = os.environ["COGNITO_IDENTITY_POOL_ID"]
 COGNITO_DEV_PROVIDER_NAME = os.environ["COGNITO_DEV_PROVIDER_NAME"]
+AWS_USE_STS = os.environ.get("AWS_USE_STS", "false").lower() == "true"
 
 def get_cognito_oidc_token(lambda_function_arn):
     cognito_client = boto3.client('cognito-identity')
@@ -22,14 +24,23 @@ def get_cognito_oidc_token(lambda_function_arn):
     )
     return response['Token']
 
-def exchange_token_for_azure_access_token(cognito_jwt):
+def get_sts_outbound_federation_token():
+    sts_client = boto3.client('sts')
+    response = sts_client.get_web_identity_token(
+    Audience=[AZURE_AUDIENCE],
+    SigningAlgorithm='ES384',
+    DurationSeconds=300
+    )
+    return response['WebIdentityToken']
+
+def exchange_token_for_azure_access_token(aws_jwt):
     """Exchange Cognito OIDC token for Azure AD access token using workload identity federation."""
     token_endpoint = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token"
     data = {
         "grant_type": "client_credentials",
         "client_id": AZURE_CLIENT_ID,
         "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-        "client_assertion": cognito_jwt,
+        "client_assertion": aws_jwt,
         "scope": AZURE_API_SCOPE
     }
     resp = requests.post(token_endpoint, data=data)
@@ -54,8 +65,11 @@ def lambda_handler(event, context):
         return {"statusCode": 400, "body": json.dumps({"error": "Email not provided."})}
 
     try:
-        cognito_jwt = get_cognito_oidc_token(context.invoked_function_arn)
-        print(f"{json.dumps(cognito_jwt)}")
+        if AWS_USE_STS:
+            aws_jwt = get_sts_outbound_federation_token()
+        else:
+            aws_jwt = get_cognito_oidc_token(context.invoked_function_arn)
+        print(f"{json.dumps(aws_jwt)}")
         # 2. Exchange for Azure AD access token
         azure_token = exchange_token_for_azure_access_token(cognito_jwt)
         print(f"{json.dumps(azure_token)}")
